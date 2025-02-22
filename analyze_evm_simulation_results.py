@@ -727,6 +727,7 @@ def draw_graph_to_compare_v2(startBlockNum, endBlockNum, first_block_to_draw, la
                 if sum(SnapshotAccountReads) != 0:
                     print("ERROR: this log has both trie read time and snapshot read time for account")
                     sys.exit()
+            ActiveIndexReads = []
             if sim_mode_name[:6] == "Ethane":
                 try:
                     ActiveIndexReads = [block_data['ActiveIndexReads'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
@@ -778,6 +779,12 @@ def draw_graph_to_compare_v2(startBlockNum, endBlockNum, first_block_to_draw, la
 
             BlockExecuteTime = [block_data['BlockExecuteTime'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
 
+            RestoreUpdates = [block_data['RestoreUpdates'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            RestoreCommits = [block_data['RestoreCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            RestoreTrieDBCommits = [block_data['RestoreTrieDBCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            RestoreDiskCommits = [block_data['RestoreDiskCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            TotalRestoreTime = [x + y + z + w for x, y, z, w in zip(RestoreUpdates, RestoreCommits, RestoreTrieDBCommits, RestoreDiskCommits)]
+
             print("sim mode:", sim_mode_name)
             print("  block range:", first_block_to_draw, "~", last_block_to_draw)
 
@@ -804,6 +811,14 @@ def draw_graph_to_compare_v2(startBlockNum, endBlockNum, first_block_to_draw, la
 
             print("  DeleteExecutes sum:", sum(DeleteExecutes))
             print("  InactivateExecutes sum:", sum(InactivateExecutes))
+
+            print("  ActiveIndexReads(includedInAccountReads) sum:", sum(ActiveIndexReads))
+
+            print("  RestoreUpdates sum:", sum(RestoreUpdates))
+            print("  RestoreCommits sum:", sum(RestoreCommits))
+            print("  RestoreTrieDBCommits sum:", sum(RestoreTrieDBCommits))
+            print("  RestoreDiskCommits sum:", sum(RestoreDiskCommits))
+            print("  TotalRestoreTime sum:", sum(TotalRestoreTime))
 
         elif field_name == "Test":
             print("test")
@@ -909,6 +924,15 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
             InactivateHashes = [block_data['InactivateHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
             y_values_to_stack[sim_mode_name][0].append(np.cumsum(InactivateHashes))
             y_values_to_stack[sim_mode_name][1].append("InactivateHashes")
+            
+            AccountRestores = [block_data['AccountRestores'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            y_values_to_stack[sim_mode_name][0].append(np.cumsum(AccountRestores))
+            y_values_to_stack[sim_mode_name][1].append("AccountRestores")
+        
+        if sim_mode_name[:7] == "Ethanos":
+            AccountRestores = [block_data['AccountRestores'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            y_values_to_stack[sim_mode_name][0].append(np.cumsum(AccountRestores))
+            y_values_to_stack[sim_mode_name][1].append("AccountRestores")
 
     # find max y value
     modes = blockExecutes.keys()
@@ -921,14 +945,12 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
 
     # draw graph
     for sim_mode_name, _ in datas.items():
+        print("draw graph for", sim_mode_name)
         
         fig, ax1 = plt.subplots()
 
-        ax1.set_ylim(top=maxExecuteTime) # set max y value
-
-        print("draw graph")
+        ax1.set_ylim(top=maxExecuteTime) # set max y value        
         ax1.plot(blockNums, blockExecutes[sim_mode_name], marker='o', markersize=1, label="block execute time")
-
         ax1.stackplot(blockNums, y_values_to_stack[sim_mode_name][0], labels=y_values_to_stack[sim_mode_name][1], alpha=0.5)
 
         ax1.set_xlabel('Block Number')
