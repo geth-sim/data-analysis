@@ -1,6 +1,7 @@
 import json, sys
 from datetime import datetime
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import bisect
 from statistics import median
@@ -969,6 +970,205 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
     print("total elapsed time:", datetime.now()-startTime)
 
 
+def compare_read_time(first_block_to_draw, last_block_to_draw, datas, window=50000, output_file='compare_read_time.png'):
+    
+    blockNums = range(first_block_to_draw, last_block_to_draw + 1)
+    plt.figure(figsize=(10, 6))
+
+    # block nums to print value (ex: 3M, 4M, ..., 10M)
+    target_blocks = list(range(first_block_to_draw, last_block_to_draw+1, window))
+    
+    for sim_mode_name, data in datas.items():
+
+        AccountReads = [block_data['AccountReads'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        StorageReads = [block_data['StorageReads'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        SnapshotAccountReads = [block_data['SnapshotAccountReads'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        SnapshotStorageReads = [block_data['SnapshotStorageReads'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+
+        readTime = [a + b + c + d for a, b, c, d in zip(AccountReads, StorageReads, SnapshotAccountReads, SnapshotStorageReads)]
+        
+        # Convert to pandas series for rolling average calculation
+        df = pd.Series(readTime, index=blockNums)
+        rolling_avg = df.rolling(window=window, min_periods=window).mean()
+        
+        # Plot the rolling average
+        plt.plot(rolling_avg.index, rolling_avg.values, label=f'{sim_mode_name}')
+
+        # print (x, y) values
+        print(f"\n[at compare_read_time(): selected points for '{sim_mode_name}'] -> start: {first_block_to_draw}, end: {last_block_to_draw}")
+        for blk in target_blocks:
+            if blk in rolling_avg.index:
+                y = rolling_avg.get(blk, None)
+                if pd.notna(y):
+                    # print(f"Block {blk}: {y} ns")
+                    print(y)
+    
+    # Graph formatting
+    plt.xlabel('Block Number')
+    plt.ylabel('Read Time (ns)')
+    plt.title(f'Read Time Comparison (MA-{window})')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save graph as PNG file
+    plt.savefig(GRAPH_PATH + output_file)
+    plt.close()
+    
+    print(f'Graph saved as {output_file}')
+
+
+def compare_write_time(first_block_to_draw, last_block_to_draw, datas, window=50000, output_file='compare_write_time.png'):
+
+    blockNums = range(first_block_to_draw, last_block_to_draw + 1)
+    plt.figure(figsize=(10, 6))
+
+    # block nums to print value (ex: 3M, 4M, ..., 10M)
+    target_blocks = list(range(first_block_to_draw, last_block_to_draw+1, window))
+    
+    for sim_mode_name, data in datas.items():
+
+        AccountCommits = [block_data['AccountCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        StorageCommits = [block_data['StorageCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        SnapshotCommits = [block_data['SnapshotCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        TrieDBCommits = [block_data['TrieDBCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        DiskCommits = [block_data['DiskCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+
+        writeTime = [a + b + c + d + e for a, b, c, d, e in zip(AccountCommits, StorageCommits, SnapshotCommits, TrieDBCommits, DiskCommits)]
+        
+        # Convert to pandas series for rolling average calculation
+        df = pd.Series(writeTime, index=blockNums)
+        rolling_avg = df.rolling(window=window, min_periods=window).mean()
+        
+        # Plot the rolling average
+        plt.plot(rolling_avg.index, rolling_avg.values, label=f'{sim_mode_name}')
+
+        # print (x, y) values
+        print(f"\n[at compare_write_time(): selected points for '{sim_mode_name}'] -> start: {first_block_to_draw}, end: {last_block_to_draw}")
+        for blk in target_blocks:
+            if blk in rolling_avg.index:
+                y = rolling_avg.get(blk, None)
+                if pd.notna(y):
+                    # print(f"Block {blk}: {y} ns")
+                    print(y)
+    
+    # Graph formatting
+    plt.xlabel('Block Number')
+    plt.ylabel('Write Time (ns)')
+    plt.title(f'Write Time Comparison (MA-{window})')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save graph as PNG file
+    plt.savefig(GRAPH_PATH + output_file)
+    plt.close()
+    
+    print(f'Graph saved as {output_file}')
+
+
+def compare_block_execute_time(first_block_to_draw, last_block_to_draw, datas, window=50000, output_file='compare_block_execute_time.png'):
+
+    blockNums = range(first_block_to_draw, last_block_to_draw + 1)
+    plt.figure(figsize=(10, 6))
+    
+    # block nums to print value (ex: 3M, 4M, ..., 10M)
+    target_blocks = list(range(first_block_to_draw, last_block_to_draw+1, window))
+
+    for sim_mode_name, data in datas.items():
+        # Extract block execution times
+        blockExecuteTime = [block_data['BlockExecuteTime'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        try:
+            AccountHashes = [block_data['AccountHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            StorageHashes = [block_data['StorageHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            # modifyHashes = [block_data['ModifyHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+            # blockExecuteTime = [b - m for b, m in zip(blockExecuteTime, modifyHashes)]
+            blockExecuteTime = [b - (a + s) for b, a, s in zip(blockExecuteTime, AccountHashes, StorageHashes)]
+        except:
+            pass
+        
+        # Convert to pandas series for rolling average calculation
+        df = pd.Series(blockExecuteTime, index=blockNums)
+        rolling_avg = df.rolling(window=window, min_periods=window).mean()
+        
+        # Plot the rolling average
+        plt.plot(rolling_avg.index, rolling_avg.values, label=f'{sim_mode_name}')
+        # plt.plot(rolling_avg.index, rolling_avg.values, marker='o', label=f'{sim_mode_name} (MA-{window})')
+
+        # print (x, y) values
+        print(f"\n[at compare_block_execute_time(): selected points for '{sim_mode_name}'] -> start: {first_block_to_draw}, end: {last_block_to_draw}")
+        for blk in target_blocks:
+            if blk in rolling_avg.index:
+                y = rolling_avg.get(blk, None)
+                if pd.notna(y):
+                    # print(f"Block {blk}: {y} ns")
+                    print(y)
+
+    # Graph formatting
+    plt.xlabel('Block Number')
+    plt.ylabel('Execution Time (ns)')
+    plt.title(f'Block Execution Time Comparison (MA-{window})')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save graph as PNG file
+    plt.savefig(GRAPH_PATH + output_file)
+    plt.close()
+    
+    print(f'Graph saved as {output_file}')
+
+
+def compare_disk_size(first_block_to_draw, last_block_to_draw, datas, output_file='compare_disk_size.png'):
+    startTime = datetime.now()
+    
+    plt.figure(figsize=(10, 6))
+
+    # block nums to print value (ex: 3M, 4M, ..., 10M)
+    target_blocks = list(range(first_block_to_draw, last_block_to_draw+1, 100_000))
+    
+    for sim_mode_name, data in datas.items():
+        # Extract disk size values and filter out zeros
+        filtered_data = []
+        block_size_map = {}  # 블록 번호 → DiskSize 맵
+
+        for block_key, block_data in data.items():
+            block_num = int(block_key)  # Convert key to integer
+            if first_block_to_draw <= block_num <= last_block_to_draw:
+                disk_size = block_data.get('DiskSize', 0)
+                if disk_size > 0:
+                    filtered_data.append((block_num, disk_size))
+                    block_size_map[block_num] = disk_size
+        
+        if not filtered_data:
+            continue
+        
+        blockNums, diskSize = zip(*filtered_data)
+        
+        # Plot non-zero disk size values as a line graph
+        plt.plot(blockNums, diskSize, label=f'{sim_mode_name}')
+
+        # print (x, y) values
+        print(f"\n[at compare_disk_size(): selected points for '{sim_mode_name}'] -> start: {first_block_to_draw}, end: {last_block_to_draw}")
+        for blk in target_blocks:
+            if blk in block_size_map:
+                # print(f"Block {blk}: {block_size_map[blk]:,} B")
+                print(block_size_map[blk])
+            # else:
+            #     print(f"Block {blk}: (no data or zero)")
+    
+    # Graph formatting
+    plt.xlabel('Block Number')
+    plt.ylabel('Disk Size (B)')
+    plt.title('Disk Size Comparison')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save graph as PNG file
+    plt.savefig(GRAPH_PATH + output_file)
+    plt.close()
+    
+    print(f'Graph saved as {output_file}')
+
+
+
 if __name__ == "__main__":
 
     startTime = datetime.now()
@@ -1023,7 +1223,20 @@ if __name__ == "__main__":
         print("  -> no Ethane data")
         sys.exit()
 
+
+    #
+    # draw stack graph for detailed block execution time
+    #
+    # graph_stack_graph(first_block_to_draw, last_block_to_draw, datas)
+    compare_block_execute_time(first_block_to_draw, last_block_to_draw, datas, graph_window_size)
+    compare_read_time(first_block_to_draw, last_block_to_draw, datas, graph_window_size)
+    compare_write_time(first_block_to_draw, last_block_to_draw, datas, graph_window_size)
+    compare_disk_size(first_block_to_draw, last_block_to_draw, datas)
+
+
+    #
     # select fields to draw graph
+    #
     field_names = ["CumumlativeBlockExecuteTime", "AvgBlockExecute", "PaymentTxAvgExecute", "CallTxAvgExecute", "TotalTxAvgExecute", 
                    "AvgReadPerTx", "AvgAccountReadPerTx", "AvgStorageReadPerTx", 
                    "AvgCommitPerTx", "DiskSize", "CompareReadTimes"]
@@ -1033,6 +1246,5 @@ if __name__ == "__main__":
         draw_graph_to_compare_v2(startBlockNum, endBlockNum, first_block_to_draw, last_block_to_draw, graph_window_size, datas, field_name)
         print("\n\n\n")
 
-    graph_stack_graph(first_block_to_draw, last_block_to_draw, datas)
 
     print("total elapsed time:", datetime.now()-startTime)
