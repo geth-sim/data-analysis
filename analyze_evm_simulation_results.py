@@ -1129,6 +1129,64 @@ def compare_block_execute_time(first_block_to_draw, last_block_to_draw, datas, w
     print(f'Graph saved as {output_file}')
 
 
+def draw_tx_stats(first_block_to_draw, last_block_to_draw, datas, window=50000, output_file='draw_tx_stats.png'):
+
+    blockNums = range(first_block_to_draw, last_block_to_draw + 1)
+    plt.figure(figsize=(10, 6))
+    
+    for sim_mode_name, data in datas.items():
+        # Extract block execution times
+        PaymentTxLen = [block_data['PaymentTxLen'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        CallTxLen = [block_data['CallTxLen'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        total_tx_num = [a+b for a,b in zip(PaymentTxLen, CallTxLen)]
+        
+        # Convert to pandas series for rolling average calculation
+        df = pd.Series(PaymentTxLen, index=blockNums)
+        rolling_avg = df.rolling(window=window, min_periods=window).mean()
+        plt.plot(rolling_avg.index, rolling_avg.values, label='payment tx')
+
+        print("Payment tx rolling average (every 100k blocks):")
+        for idx, val in rolling_avg.dropna().items():
+            if idx % 100000 == 0:
+                # print(f"Block {idx}: {val}")
+                print(val)
+
+        df = pd.Series(CallTxLen, index=blockNums)
+        rolling_avg = df.rolling(window=window, min_periods=window).mean()
+        plt.plot(rolling_avg.index, rolling_avg.values, label='contract tx')
+
+        print("Contract tx rolling average (every 100k blocks):")
+        for idx, val in rolling_avg.dropna().items():
+            if idx % 100000 == 0:
+                # print(f"Block {idx}: {val}")
+                print(val)
+
+        df = pd.Series(total_tx_num, index=blockNums)
+        rolling_avg = df.rolling(window=window, min_periods=window).mean()
+        plt.plot(rolling_avg.index, rolling_avg.values, label='total tx')
+
+        print("Total tx rolling average (every 100k blocks):")
+        for idx, val in rolling_avg.dropna().items():
+            if idx % 100000 == 0:
+                # print(f"Block {idx}: {val}")
+                print(val)
+
+        break
+
+    # Graph formatting
+    plt.xlabel('Block Number')
+    plt.ylabel('# of Transactions')
+    plt.title(f'Transaction Count (MA-{window})')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save graph as PNG file
+    plt.savefig(GRAPH_PATH + output_file)
+    plt.close()
+    
+    print(f'Graph saved as {output_file}')
+
+
 def compare_disk_size(first_block_to_draw, last_block_to_draw, datas, output_file='compare_disk_size.png'):
     startTime = datetime.now()
     
@@ -1178,6 +1236,54 @@ def compare_disk_size(first_block_to_draw, last_block_to_draw, datas, output_fil
     plt.savefig(GRAPH_PATH + output_file)
     plt.close()
     
+    print(f'Graph saved as {output_file}')
+
+
+def compare_disk_size_diff(first_block_to_draw, last_block_to_draw, datas, window=10, output_file='compare_disk_size_diff_mavg.png'):
+
+    plt.figure(figsize=(10, 6))
+
+    for sim_mode_name, data in datas.items():
+        # 추출 및 필터링
+        filtered_data = []
+        for block_key, block_data in data.items():
+            block_num = int(block_key)
+            if first_block_to_draw <= block_num <= last_block_to_draw:
+                disk_size = block_data.get('DiskSize', 0)
+                if disk_size > 0:
+                    filtered_data.append((block_num, disk_size))
+
+        if len(filtered_data) < 2:
+            continue
+        
+        # 정렬 (block number 기준)
+        filtered_data.sort()
+        blockNums, diskSizes = zip(*filtered_data)
+
+        # diff 계산
+        diff_values = [curr - prev for prev, curr in zip(diskSizes[:-1], diskSizes[1:])]
+        diff_blocks = blockNums[1:]
+
+        # Pandas Series로 변환
+        diff_series = pd.Series(diff_values, index=diff_blocks)
+
+        # 이동 평균 계산
+        rolling_avg = diff_series.rolling(window=window, min_periods=1).mean()
+
+        # 그래프 출력
+        plt.plot(rolling_avg.index, rolling_avg.values, label=f'{sim_mode_name}')
+
+    # 그래프 설정
+    plt.xlabel('Block Number')
+    plt.ylabel('Disk Size Diff (B)')
+    plt.title(f'Disk Size Diff (Moving Average, window={window})')
+    plt.legend()
+    plt.grid(True)
+
+    # 저장
+    plt.savefig(GRAPH_PATH + output_file)
+    plt.close()
+
     print(f'Graph saved as {output_file}')
 
 
@@ -1237,6 +1343,7 @@ if __name__ == "__main__":
         sys.exit()
 
 
+
     #
     # draw stack graph for detailed block execution time
     #
@@ -1245,6 +1352,10 @@ if __name__ == "__main__":
     compare_read_time(first_block_to_draw, last_block_to_draw, datas, graph_window_size)
     compare_write_time(first_block_to_draw, last_block_to_draw, datas, graph_window_size)
     compare_disk_size(first_block_to_draw, last_block_to_draw, datas)
+    compare_disk_size_diff(first_block_to_draw, last_block_to_draw, datas)
+    # draw_tx_stats(first_block_to_draw, last_block_to_draw, datas, graph_window_size)
+    print("total elapsed time:", datetime.now()-startTime)
+
 
 
     #
