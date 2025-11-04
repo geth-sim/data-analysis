@@ -832,12 +832,13 @@ def draw_graph_to_compare_v2(startBlockNum, endBlockNum, first_block_to_draw, la
         # draw lines
         for i in range(len(x_values_list)):
             ax1.plot(x_values_list[i], y_values_list[i], marker='o', markersize=2, label=label_list[i])
+            # ax1.scatter(x_values_list[i], y_values_list[i], s=2, label=label_list[i])
 
             # print values
-            print("label:", label_list[i])
-            print("x values:", x_values_list[i])
-            print("y values:", y_values_list[i])
-            print("\n")
+            # print("label:", label_list[i])
+            # print("x values:", x_values_list[i])
+            # print("y values:", y_values_list[i])
+            # print("\n")
 
         # set axis
         ax1.set_xlabel('Block Number')
@@ -876,6 +877,10 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
         SnapshotCommits = [block_data['SnapshotCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
         TrieDBCommits = [block_data['TrieDBCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
         DiskCommits = [block_data['DiskCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        try:
+            ModifyHashes = [block_data['ModifyHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        except:
+            ModifyHashes = [0] * (last_block_to_draw - first_block_to_draw + 1)
 
         # collect accumulative values
         blockExecutes[sim_mode_name] = np.cumsum(blockExecuteTime)
@@ -891,6 +896,7 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
         y_values_to_stack[sim_mode_name][0].append(np.cumsum(SnapshotCommits))
         y_values_to_stack[sim_mode_name][0].append(np.cumsum(TrieDBCommits))
         y_values_to_stack[sim_mode_name][0].append(np.cumsum(DiskCommits))
+        y_values_to_stack[sim_mode_name][0].append(np.cumsum(ModifyHashes))
         
         # collect legends
         y_values_to_stack[sim_mode_name][1].append("PaymentTxExecutes")
@@ -904,6 +910,7 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
         y_values_to_stack[sim_mode_name][1].append("SnapshotCommits")
         y_values_to_stack[sim_mode_name][1].append("TrieDBCommits")
         y_values_to_stack[sim_mode_name][1].append("DiskCommits")
+        y_values_to_stack[sim_mode_name][1].append("ModifyHashes")
 
         if sim_mode_name[:6] == "Ethane":
             DeleteUpdates = [block_data['DeleteUpdates'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
@@ -962,7 +969,9 @@ def graph_stack_graph(first_block_to_draw, last_block_to_draw, datas):
         plt.title('Block execution time analysis')
         plt.legend()
 
-        plt.savefig(GRAPH_PATH + "block_execution_time_analysis_" + sim_mode_name + '_' + str(first_block_to_draw) + "_" + str(last_block_to_draw) + '.png')
+        graph_name = "block_execution_time_analysis_" + sim_mode_name + '_' + str(first_block_to_draw) + "_" + str(last_block_to_draw) + '.png'
+        plt.savefig(GRAPH_PATH + graph_name)
+        print("graph name:", graph_name)
 
         print("elapsed time:", datetime.now()-startTime)
 
@@ -986,7 +995,8 @@ def compare_read_time(first_block_to_draw, last_block_to_draw, datas, window=500
         SnapshotStorageReads = [block_data['SnapshotStorageReads'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
 
         readTime = [a + b + c + d for a, b, c, d in zip(AccountReads, StorageReads, SnapshotAccountReads, SnapshotStorageReads)]
-        
+        print("total read time:", sim_mode_name, "->", sum(readTime), "ns")
+
         # Convert to pandas series for rolling average calculation
         df = pd.Series(readTime, index=blockNums)
         rolling_avg = df.rolling(window=window, min_periods=window).mean()
@@ -1034,7 +1044,8 @@ def compare_write_time(first_block_to_draw, last_block_to_draw, datas, window=50
         DiskCommits = [block_data['DiskCommits'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
 
         writeTime = [a + b + c + d + e for a, b, c, d, e in zip(AccountCommits, StorageCommits, SnapshotCommits, TrieDBCommits, DiskCommits)]
-        
+        print("total write time:", sim_mode_name, "->", sum(writeTime), "ns")
+
         # Convert to pandas series for rolling average calculation
         df = pd.Series(writeTime, index=blockNums)
         rolling_avg = df.rolling(window=window, min_periods=window).mean()
@@ -1076,6 +1087,7 @@ def compare_block_execute_time(first_block_to_draw, last_block_to_draw, datas, w
     for sim_mode_name, data in datas.items():
         # Extract block execution times
         blockExecuteTime = [block_data['BlockExecuteTime'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
+        print("total block execution time w/ hashing time:", sim_mode_name, "->", sum(blockExecuteTime), "ns")
         try:
             AccountHashes = [block_data['AccountHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
             StorageHashes = [block_data['StorageHashes'] for block_data in data.values()][first_block_to_draw:last_block_to_draw+1]
@@ -1084,6 +1096,7 @@ def compare_block_execute_time(first_block_to_draw, last_block_to_draw, datas, w
             blockExecuteTime = [b - (a + s) for b, a, s in zip(blockExecuteTime, AccountHashes, StorageHashes)]
         except:
             pass
+        print("total block execution time w/o hashing time:", sim_mode_name, "->", sum(blockExecuteTime), "ns")
         
         # Convert to pandas series for rolling average calculation
         df = pd.Series(blockExecuteTime, index=blockNums)
